@@ -6,54 +6,19 @@
 
 'use strict';
 
-const { Contract } = require('fabric-contract-api');
+const {Contract} = require('fabric-contract-api');
 
 class AssetTransfer extends Contract {
 
     async InitLedger(ctx) {
         const assets = [
             {
-                ID: 'asset1',
-                Color: 'blue',
-                Size: 5,
-                Owner: 'Tomoko',
-                AppraisedValue: 300,
-            },
-            {
-                ID: 'asset2',
-                Color: 'red',
-                Size: 5,
-                Owner: 'Brad',
-                AppraisedValue: 400,
-            },
-            {
-                ID: 'asset3',
-                Color: 'green',
-                Size: 10,
-                Owner: 'Jin Soo',
-                AppraisedValue: 500,
-            },
-            {
-                ID: 'asset4',
-                Color: 'yellow',
-                Size: 10,
-                Owner: 'Max',
-                AppraisedValue: 600,
-            },
-            {
-                ID: 'asset5',
-                Color: 'black',
-                Size: 15,
-                Owner: 'Adriana',
-                AppraisedValue: 700,
-            },
-            {
-                ID: 'asset6',
-                Color: 'white',
-                Size: 15,
-                Owner: 'Michel',
-                AppraisedValue: 800,
-            },
+                ID: "testThermometer",
+                deviceName: "randomName1",
+                room: "labos",
+                temperature: 0,
+                hasBeenOutsideOfRange: false
+            }
         ];
 
         for (const asset of assets) {
@@ -64,13 +29,14 @@ class AssetTransfer extends Contract {
     }
 
     // CreateAsset issues a new asset to the world state with given details.
-    async CreateAsset(ctx, id, color, size, owner, appraisedValue) {
+    async CreateAsset(ctx, id, apiKey, deviceName, room, temperature) {
         const asset = {
             ID: id,
-            Color: color,
-            Size: size,
-            Owner: owner,
-            AppraisedValue: appraisedValue,
+            apiKey: apiKey,
+            deviceName: deviceName,
+            room: room,
+            temperature: temperature,
+            hasBeenOutsideOfRange: false
         };
         ctx.stub.putState(id, Buffer.from(JSON.stringify(asset)));
         return JSON.stringify(asset);
@@ -86,7 +52,7 @@ class AssetTransfer extends Contract {
     }
 
     // UpdateAsset updates an existing asset in the world state with provided parameters.
-    async UpdateAsset(ctx, id, color, size, owner, appraisedValue) {
+    async UpdateAsset(ctx, id, deviceName, room, temperature) {
         const exists = await this.AssetExists(ctx, id);
         if (!exists) {
             throw new Error(`The asset ${id} does not exist`);
@@ -95,14 +61,23 @@ class AssetTransfer extends Contract {
         // overwriting original asset with new asset
         let updatedAsset = {
             ID: id,
-            Color: color,
-            Size: size,
-            Owner: owner,
-            AppraisedValue: appraisedValue,
+            deviceName: deviceName,
+            room: room,
+            temperature: temperature,
+            hasBeenOutsideOfRange: false
         };
 
-        if(updatedAsset.AppraisedValue > 90){
-            updatedAsset.customEvent = "pa ja sam najjaci";
+        const invalidTemp = 90;
+
+        if (updatedAsset.temperature > invalidTemp) {
+            updatedAsset.hasBeenOutsideOfRange = true;
+            updatedAsset.customEvent = "temperature is out of range";
+            updatedAsset.isOutOfRange = true;
+        }
+
+        if (updatedAsset.isOutOfRange && updatedAsset.temperature < (invalidTemp - 10)) {
+            updatedAsset.customEvent = "temperature has normalized";
+            updatedAsset.isOutOfRange = false;
         }
 
         ctx.stub.setEvent("temperatureUpdate", Buffer.from(JSON.stringify(updatedAsset)));
@@ -147,7 +122,7 @@ class AssetTransfer extends Contract {
                 console.log(err);
                 record = strValue;
             }
-            allResults.push({ Key: result.value.key, Record: record });
+            allResults.push({Key: result.value.key, Record: record});
             result = await iterator.next();
         }
         return JSON.stringify(allResults);
