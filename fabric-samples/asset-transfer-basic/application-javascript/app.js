@@ -183,12 +183,24 @@ async function main() {
 }
 
 var counter = 0;
-async function registerContractEventListener(){
+async function  registerContractEventListener(){
     try {
 
         const ccp = buildCCPOrg1();
 
+        // build an instance of the fabric ca services client based on
+        // the information in the network configuration
+        const caClient = buildCAClient(FabricCAServices, ccp, 'ca.org1.example.com');
+
+        // setup the wallet to hold the credentials of the application user
         const wallet = await buildWallet(Wallets, walletPath);
+
+        // in a real application this would be done on an administrative flow, and only once
+        await enrollAdmin(caClient, wallet, mspOrg1);
+
+        // in a real application this would be done only when a new user was required to be added
+        // and would be part of an administrative flow
+        await registerAndEnrollUser(caClient, wallet, mspOrg1, org1UserId, 'org1.department1');
 
         const gateway = new Gateway();
             // setup the gateway instance
@@ -209,13 +221,10 @@ async function registerContractEventListener(){
             const listener = await contract.addContractListener(async (event) => {
                 if(event.getTransactionEvent().isValid){
                     const payload = JSON.parse(event.payload.toString('utf8'));
-                    console.log("pristigao event "+ event.eventName);
-
-                    console.log(payload);
+                    console.log("the following event arrived" + event.eventName);
                     if(payload.customEvent != null){
-                        console.log("moj event custom thing");
                         console.log(payload.customEvent);
-                        testServer();
+                        testServer(payload);
                     }
                 }
             });
@@ -304,34 +313,11 @@ async function communicateWithNetwork(response) {
             // Get the contract from the network.
             const contract = network.getContract(chaincodeName);
 
-            // Now let's try to submit a transaction.
-            // This will be sent to both peers and if both peers endorse the transaction, the endorsed proposal will be sent
-            // to the orderer to be committed by each of the peer's to the channel ledger.
-
-            console.log('\n--> Evaluate Transaction: AssetExists, function returns "true" if an asset with given assetID exist');
-            let result = await contract.evaluateTransaction('AssetExists', response.metadata.deviceName);
-            console.log(`*** Result: ${prettyJSONString(result.toString())}`);
-
-            console.log('\n--> Submit Transaction: CreateAsset, creates new asset with ID, color, owner, size, and appraisedValue arguments');
-            console.log(response.metadata.deviceName);
-            console.log(response.metadata.deviceType);
-            console.log(response.temperature);
-            result = await contract.submitTransaction('CreateAsset', response.metadata.deviceName , response.metadata.deviceType, '5', 'Leonardo', response.temperature);
-            console.log('*** Result: committed');
-            if (`${result}` !== '') {
-                console.log(`*** Result: ${prettyJSONString(result.toString())}`);
-            }
-
-            console.log('\n--> Submit Transaction: UpdateAsset asset1, change the appraisedValue to 350');
-            await contract.submitTransaction('UpdateAsset', response.metadata.deviceName , response.metadata.deviceType, '5', 'Leonardo', response.temperature+5);
+            console.log(response);
+            await contract.submitTransaction('UpdateAsset', response.deviceId,response.metadata.deviceName , response.metadata.room, response.temperature);
             console.log('*** Result: committed');
 
-            console.log('\n--> Evaluate Transaction: ReadAsset, function returns "asset1" attributes');
-            result = await contract.evaluateTransaction('ReadAsset', response.metadata.deviceName);
-            console.log(`*** Result: ${prettyJSONString(result.toString())}`);
         } finally {
-            // Disconnect from the gateway when the application is closing
-            // This will close all connections to the network
             gateway.disconnect();
         }
     } catch (error) {
@@ -340,17 +326,46 @@ async function communicateWithNetwork(response) {
 
 }
 
-function testServer() {
+async function registerAsset(response) {
+    try {
+
+        const ccp = buildCCPOrg1();
+
+        const  wallet = await buildWallet(Wallets, walletPath);
+
+        const gateway = new Gateway();
+
+        try {
+            await gateway.connect(ccp, {
+                wallet,
+                identity: org1UserId,
+                discovery: {enabled: true, asLocalhost: true}
+            });
+            const network = await gateway.getNetwork(channelName);
+            const contract = network.getContract(chaincodeName);
+            let result = await contract.submitTransaction('CreateAsset',response.id, response.apiKey,response.deviceName,response.room,response.temperature);
+        } finally {
+            gateway.disconnect();
+        }
+    } catch (error) {
+        console.error(`******** FAILED to run the application: ${error}`);
+    }
+
+}
+
+function testServer(payload) {
     axios
-        .post('http://localhost:8080/api/v1/0XqdlUvP37LEJldCyyI6/telemetry', {
-            temperature: 20,
-            alarm: true
+        .post(`http://localhost:8080/api/v1/${payload.apiKey}/telemetry`, {
+            temperature: payload.temperature,
+            isOutOfRange: payload.isOutOfRange,
+            alarm: payload.alarm
         })
         .then(res => {
             console.log(`statusCode: ${res.status}`);
         })
         .catch(error => {
             console.log("error ocurred");
+            console.log(error)
         });
 }
 
@@ -368,11 +383,16 @@ app.post('/thingsboard', (req, res) => {
     res.end('Hello World!');
 });
 
-// create application/json parser
-var jsonParser = bodyParser.json()
+app.post('/register-asset', (req, res) => {
+    registerAsset(req.body);
+    res.end('asset created!');
+});
 
 app.listen(port, () => {
     registerContractEventListener();
     console.log(`app listening at http://localhost:${port}`)
 });
 //test();
+
+// ./network.sh up createChannel -c mychannel -ca -s couchdb
+//./network.sh deployCC -ccn basic -ccp ../asset-transfer-basic/chaincode-javascript/ -ccl javascript

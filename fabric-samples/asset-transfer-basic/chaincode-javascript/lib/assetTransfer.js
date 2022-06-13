@@ -58,29 +58,41 @@ class AssetTransfer extends Contract {
             throw new Error(`The asset ${id} does not exist`);
         }
 
+        const payload = await this.ReadAsset(ctx,id);
+        const asset = JSON.parse(payload.toString());
         // overwriting original asset with new asset
-        let updatedAsset = {
-            ID: id,
-            deviceName: deviceName,
-            room: room,
-            temperature: temperature,
-            hasBeenOutsideOfRange: false
+
+        let updatedAsset = {...asset,
+            ID: id != null ? id : asset.ID,
+            deviceName: deviceName != null ? deviceName : asset.deviceName,
+            room: room != null ? room : asset.room,
+            temperature: temperature != null ? temperature : asset.temperature
         };
 
         const invalidTemp = 90;
 
         if (updatedAsset.temperature > invalidTemp) {
             updatedAsset.hasBeenOutsideOfRange = true;
-            updatedAsset.customEvent = "temperature is out of range";
+            if(updatedAsset.customEvent){
+                updatedAsset.customEvent = null;
+            } else {
+                updatedAsset.customEvent = "temperature is out of range";
+                updatedAsset.alarm = true;
+            }
             updatedAsset.isOutOfRange = true;
-        }
-
-        if (updatedAsset.isOutOfRange && updatedAsset.temperature < (invalidTemp - 10)) {
-            updatedAsset.customEvent = "temperature has normalized";
+        }else{
+            if(updatedAsset.customEvent){
+                updatedAsset.customEvent = null;
+            }else{
+                updatedAsset.customEvent = "temperature has normalized";
+                updatedAsset.alarm = false;
+            }
             updatedAsset.isOutOfRange = false;
         }
 
-        ctx.stub.setEvent("temperatureUpdate", Buffer.from(JSON.stringify(updatedAsset)));
+        if(updatedAsset.customEvent != null){
+            ctx.stub.setEvent("temperatureUpdate", Buffer.from(JSON.stringify(updatedAsset)));
+        }
         return ctx.stub.putState(id, Buffer.from(JSON.stringify(updatedAsset)));
     }
 
