@@ -13,3 +13,5 @@ services:
     volumes:
       - ./mytb-data:/data
       - ./mytb-logs:/var/log/thingsboard
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
