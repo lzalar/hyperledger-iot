@@ -21,4 +21,4 @@ build
 package-lock.json
 thingsboard/mytb-data
 thingsboard/mytb-logs
-explorer/organizations
+explorer/organizations/*
