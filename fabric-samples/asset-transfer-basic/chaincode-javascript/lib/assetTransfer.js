@@ -29,12 +29,12 @@ class AssetTransfer extends Contract {
     }
 
     // CreateAsset issues a new asset to the world state with given details.
-    async CreateAsset(ctx, id, apiKey, deviceName, room, temperature) {
+    async CreateAsset(ctx, id, apiKey, deviceName, temperatureThreshold, temperature) {
         const asset = {
             ID: id,
             apiKey: apiKey,
             deviceName: deviceName,
-            room: room,
+            temperatureThreshold: temperatureThreshold,
             temperature: temperature,
             hasBeenOutsideOfRange: false
         };
@@ -57,7 +57,6 @@ class AssetTransfer extends Contract {
         if (!exists) {
             throw new Error(`The asset ${id} does not exist`);
         }
-
         const payload = await this.ReadAsset(ctx,id);
         const asset = JSON.parse(payload.toString());
         // overwriting original asset with new asset
@@ -69,9 +68,7 @@ class AssetTransfer extends Contract {
             temperature: temperature != null ? temperature : asset.temperature
         };
 
-        const invalidTemp = 90;
-
-        if (updatedAsset.temperature > invalidTemp) {
+        if (updatedAsset.temperature > updatedAsset.temperatureThreshold) {
             updatedAsset.hasBeenOutsideOfRange = true;
             if(updatedAsset.customEvent){
                 updatedAsset.customEvent = null;
@@ -91,7 +88,7 @@ class AssetTransfer extends Contract {
         }
 
         if(updatedAsset.customEvent != null){
-            ctx.stub.setEvent("temperatureUpdate", Buffer.from(JSON.stringify(updatedAsset)));
+            ctx.stub.setEvent("temperatureAlarmUpdate", Buffer.from(JSON.stringify(updatedAsset)));
         }
         return ctx.stub.putState(id, Buffer.from(JSON.stringify(updatedAsset)));
     }
