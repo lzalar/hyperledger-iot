@@ -147,8 +147,3 @@ app.listen(port, () => {
     registerContractEventListener();
     console.log(`app listening at http://localhost:${port}`)
 });
-
-// ./network.sh up createChannel -c mychannel -ca -s couchdb
-//./network.sh deployCC -ccn basic -ccp ../asset-transfer-basic/chaincode-javascript/ -ccl javascript
-// curl -sSL https://bit.ly/2ysbOFE | bash -s -- 2.2.5 1.5.2
-// cp -r ../fabric-samples/test-network/organizations .
