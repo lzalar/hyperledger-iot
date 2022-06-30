@@ -15,7 +15,7 @@ class AssetTransfer extends Contract {
             {
                 ID: "testThermometer",
                 deviceName: "randomName1",
-                room: "labos",
+                temperatureThreshold: 20,
                 temperature: 0,
                 hasBeenOutsideOfRange: false
             }
