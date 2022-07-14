@@ -52,6 +52,23 @@ class AssetTransfer extends Contract {
     }
 
     // UpdateAsset updates an existing asset in the world state with provided parameters.
+    async UpdateTemperatureThreshold(ctx, id, temperatureThreshold) {
+        const exists = await this.AssetExists(ctx, id);
+        if (!exists) {
+            throw new Error(`The asset ${id} does not exist`);
+        }
+        const payload = await this.ReadAsset(ctx,id);
+        const asset = JSON.parse(payload.toString());
+        // overwriting original asset with new asset
+
+        let updatedAsset = {...asset,
+            temperatureThreshold: temperatureThreshold != null ? temperatureThreshold : asset.temperatureThreshold
+        };
+
+        return ctx.stub.putState(id, Buffer.from(JSON.stringify(updatedAsset)));
+    }
+
+    // UpdateAsset updates an existing asset in the world state with provided parameters.
     async UpdateAsset(ctx, id, deviceName, room, temperature) {
         const exists = await this.AssetExists(ctx, id);
         if (!exists) {

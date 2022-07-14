@@ -85,12 +85,10 @@ async function communicateWithNetwork(message) {
     } catch (error) {
         console.error(`******** FAILED: ${error}`);
     }
-
 }
 
 async function registerAsset(response) {
     try {
-
         const ccp = buildCCPOrg1();
 
         const  wallet = await buildWallet(Wallets, walletPath);
@@ -105,7 +103,34 @@ async function registerAsset(response) {
             });
             const network = await gateway.getNetwork(channelName);
             const contract = network.getContract(chaincodeName);
-            let result = await contract.submitTransaction('CreateAsset',response.id, response.apiKey,response.deviceName,response.temperatureThreshold,response.temperature);
+            let result = await contract.submitTransaction('CreateAsset',response.id, response.apiKey,
+                response.deviceName,response.temperatureThreshold,response.temperature);
+        } finally {
+            gateway.disconnect();
+        }
+    } catch (error) {
+        console.error(`******** FAILED registering asset: ${error}`);
+    }
+
+}
+
+async function changeTemp(response) {
+    try {
+        const ccp = buildCCPOrg1();
+
+        const  wallet = await buildWallet(Wallets, walletPath);
+
+        const gateway = new Gateway();
+
+        try {
+            await gateway.connect(ccp, {
+                wallet,
+                identity: org1UserId,
+                discovery: {enabled: true, asLocalhost: true}
+            });
+            const network = await gateway.getNetwork(channelName);
+            const contract = network.getContract(chaincodeName);
+            let result = await contract.submitTransaction('UpdateTemperatureThreshold',response.id, response.temperatureThreshold);
         } finally {
             gateway.disconnect();
         }
@@ -141,6 +166,10 @@ app.post('/thingsboard', (req, res) => {
 
 app.post('/register-asset', (req, res) => {
     registerAsset(req.body);
+});
+
+app.post('/change-temperature',(req,res)=>{
+    changeTemp(req.body);
 });
 
 app.listen(port, () => {
